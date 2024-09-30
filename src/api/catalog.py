@@ -30,6 +30,7 @@ def get_catalog():
         row = result.fetchone()
         if row:
             num_green_potions = row[0]
+            print(row[0])
     print(f"Catalog: There are {num_green_potions} available in inventory")
 
     return [

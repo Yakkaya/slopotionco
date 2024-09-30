@@ -77,15 +77,14 @@ def search_orders(
         )
     ]
 
-    start = search_page * 5
+    start = int(search_page) * 5
     end = start + 5
 
     return {
-        "previous": search_page - 1 if search_page > 0 else None,
-        "next": search_page + 1 if len(results[start:end]) == 5 else None,
+        "previous": int(search_page) - 1 if int(search_page) > 0 else None,
+        "next": int(search_page) + 1 if len(results[start:end]) == 5 else None,
         "results": results[start:end],
     }
-
 
 class Customer(BaseModel):
     customer_name: str

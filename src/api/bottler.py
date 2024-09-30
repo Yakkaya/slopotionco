@@ -45,10 +45,24 @@ def get_bottle_plan():
     # Initial logic: bottle all barrels into red potions.
     # Version 1 Logic: bottle all barrels into green potions
 
+    select_expression = f"SELECT num_green_ml FROM {INVENTORY_TABLE_NAME}"
+
+    green_potion_quantity = 0
+    
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(select_expression))
+        row = result.fetchone()
+        if row and row[0] >= 100:
+            # if the number of green potions is less than 10, request a new barrel
+            green_potion_quantity = row[0]/100
+        else:
+            print(f"Not enough green ml for mixing potion")
+    print(f"Bottle Plan: make {green_potion_quantity} green potions")
+
     return [
             {
                 "potion_type": [0, 100, 0, 0],
-                "quantity": 5,
+                "quantity": green_potion_quantity,
             }
         ]
 
