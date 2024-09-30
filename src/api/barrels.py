@@ -44,14 +44,28 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     """ """
     print(wholesale_catalog)
     request_quantity = 0
-    select_expression = f"SELECT num_green_potions FROM {INVENTORY_TABLE_NAME}"
-    with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(select_expression))
-        row = result.fetchone()
-        if row and row[0] < 10:
-            # if the number of green potions is less than 10, request a new barrel
-            request_quantity = 1
-    print(f"Requested {request_quantity} small green barrel")
+    select_expression = f"SELECT num_green_potions, gold FROM {INVENTORY_TABLE_NAME}"
+    update_gold_expression = sqlalchemy.text(f"""
+        UPDATE {INVENTORY_TABLE_NAME} 
+        SET gold = gold - :barrel_cost
+    """)
+
+    for barrel in wholesale_catalog:
+        # Version 1 only supports green potions
+        if barrel.sku == "SMALL_GREEN_BARREL": 
+            with db.engine.begin() as connection:
+                result = connection.execute(sqlalchemy.text(select_expression))
+                row = result.fetchone()
+                num_green_potions_inventory = row[0]
+                gold_inventory = row[1]
+                if row and num_green_potions_inventory < 10 and gold_inventory >= barrel.price:
+                    # if the number of green potions is less than 10 and gold in inventory is 
+                    # sufficient, request a new barrel
+                    request_quantity = 1
+                    result = connection.execute(update_gold_expression, {
+                        "barrel_cost": request_quantity * barrel.price
+                    }) 
+                print(f"Requested {request_quantity} small green barrel. Deducted gold by {request_quantity * barrel.price}")
 
     return [
         {
