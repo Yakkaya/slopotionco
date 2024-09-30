@@ -14,8 +14,6 @@ class CatalogItem(BaseModel):
     price: int
     potion_type: list[int]  # r, g, b, d as integers adding to 100
 
-INVENTORY_TABLE_NAME = "global_inventory"
-
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
     """

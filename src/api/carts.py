@@ -1,3 +1,5 @@
+import sqlalchemy
+from src import database as db
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
@@ -9,6 +11,8 @@ router = APIRouter(
     tags=["cart"],
     dependencies=[Depends(auth.get_api_key)],
 )
+
+INVENTORY_TABLE_NAME = "global_inventory"
 
 class search_sort_options(str, Enum):
     customer_name = "customer_name"
