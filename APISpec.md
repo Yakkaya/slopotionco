@@ -246,7 +246,7 @@ shop should take this as an opportunity to remove all of their inventory and set
 
 ### 5. Info Functions
 
-### .1. Current time - `/info/current_time` (POST)
+### 5.1. Current time - `/info/current_time` (POST)
 
 Shares what the latest time (in game time) is. 
 

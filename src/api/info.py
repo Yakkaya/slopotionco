@@ -17,5 +17,11 @@ def post_time(timestamp: Timestamp):
     """
     Share current time.
     """
-    return "OK"
+    return {
+        "current_time": {
+            "day": timestamp.day,
+            "hour": timestamp.hour
+        },
+        "message": f"The current time is {timestamp.hour}:00 on {timestamp.day}."
+    }
 
