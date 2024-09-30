@@ -31,6 +31,11 @@ def get_catalog():
         if row:
             num_green_potions = row[0]
             print(row[0])
+    
+    # Ensure green potion quantity isnt negative
+    if num_green_potions < 0:
+        num_green_potions = 0 
+    
     print(f"Catalog: There are {num_green_potions} available in inventory")
 
     return [

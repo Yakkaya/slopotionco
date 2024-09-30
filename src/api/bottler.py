@@ -1,9 +1,11 @@
 import sqlalchemy
+import math
 from src import database as db
 from fastapi import APIRouter, Depends
 from enum import Enum
 from pydantic import BaseModel
 from src.api import auth
+
 
 INVENTORY_TABLE_NAME = "global_inventory"
 
@@ -54,7 +56,7 @@ def get_bottle_plan():
         row = result.fetchone()
         if row and row[0] >= 100:
             # if the number of green potions is less than 10, request a new barrel
-            green_potion_quantity = row[0]/100
+            green_potion_quantity = math.floor(row[0]/100)
         else:
             print(f"Not enough green ml for mixing potion")
     print(f"Bottle Plan: make {green_potion_quantity} green potions")
