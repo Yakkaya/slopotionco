@@ -23,16 +23,14 @@ class PotionInventory(BaseModel):
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
     update_expression = sqlalchemy.text(f"""
         UPDATE {INVENTORY_TABLE_NAME} 
-        SET num_green_potions = num_green_potions + :quantity,
-        num_green_ml = num_green_ml - :ml
+        SET num_green_potions = num_green_potions + :quantity
     """)
     
     for potion_inventory in potions_delivered:
         if potion_inventory.potion_type[1]: 
             with db.engine.begin() as connection:
                 connection.execute(update_expression, {
-                    "quantity": potion_inventory.quantity,
-                    "ml": potion_inventory.potion_type[1]
+                    "quantity": potion_inventory.quantity
                 })
     print(f"potions delievered: {potions_delivered} order_id: {order_id}")
     return "OK"
@@ -50,7 +48,11 @@ def get_bottle_plan():
     # Initial logic: bottle all barrels into red potions.
     # Version 1 Logic: bottle all barrels into green potions
 
-    select_expression = f"SELECT num_green_ml, num_green_potions FROM {INVENTORY_TABLE_NAME}"
+    select_expression = f"SELECT num_green_ml FROM {INVENTORY_TABLE_NAME}"
+    update_expression = sqlalchemy.text(f"""
+        UPDATE {INVENTORY_TABLE_NAME} 
+        SET num_green_ml = num_green_ml - :ml
+    """)
 
     green_potion_quantity = 0
     
@@ -58,10 +60,12 @@ def get_bottle_plan():
         result = connection.execute(sqlalchemy.text(select_expression))
         row = result.fetchone()
         num_green_ml = row[0]
-        num_green_potions = row[1]
-        if num_green_potions < 10 and num_green_ml >= 100:
-            # if the number of green potions is less than 10, request a new barrel
-            green_potion_quantity = math.floor(row[0]/100)
+        if num_green_ml >= 100:
+            green_potion_quantity = math.floor(num_green_ml/100)
+            ml_used = green_potion_quantity * 100
+            connection.execute(update_expression, {
+                "ml": ml_used
+            }) 
         else:
             print(f"Not enough green ml for mixing potion")
     print(f"Bottle Plan: make {green_potion_quantity} green potions")
