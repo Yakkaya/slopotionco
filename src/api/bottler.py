@@ -27,11 +27,10 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     """)
     
     for potion_inventory in potions_delivered:
-        if potion_inventory.potion_type[1]: 
-            with db.engine.begin() as connection:
-                connection.execute(update_expression, {
-                    "quantity": potion_inventory.quantity
-                })
+        with db.engine.begin() as connection:
+            connection.execute(update_expression, {
+                "quantity": potion_inventory.quantity
+            })
     print(f"potions delievered: {potions_delivered} order_id: {order_id}")
     return "OK"
 

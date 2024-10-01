@@ -30,7 +30,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
 
     for barrel in barrels_delivered:
         if barrel.sku == "SMALL_GREEN_BARREL":
-            ml = barrel.ml_per_barrel * barrel.quantity
+            ml = barrel.ml_per_barrel
             with db.engine.begin() as connection:
                 connection.execute(update_expression, {
                 "ml": ml
@@ -60,7 +60,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                 num_green_potions_inventory = row[0]
                 gold_inventory = row[1]
                 barrel_cost = 0
-                if row and num_green_potions_inventory < 10 and gold_inventory >= barrel.price:
+                if num_green_potions_inventory < 10 and gold_inventory >= barrel.price:
                     # if the number of green potions is less than 10 and gold in inventory is 
                     # sufficient, request a new barrel
                     request_quantity = 1
