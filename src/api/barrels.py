@@ -29,11 +29,12 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     """)
 
     for barrel in barrels_delivered:
-        ml = barrel.ml_per_barrel * barrel.quantity
-        with db.engine.begin() as connection:
-            connection.execute(update_expression, {
-            "ml": ml
-        })
+        if barrel.sku == "SMALL_GREEN_BARREL":
+            ml = barrel.ml_per_barrel * barrel.quantity
+            with db.engine.begin() as connection:
+                connection.execute(update_expression, {
+                "ml": ml
+            })
     print(f"barrels delievered: {barrels_delivered} order_id: {order_id}")
 
     return "OK"
@@ -58,14 +59,16 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                 row = result.fetchone()
                 num_green_potions_inventory = row[0]
                 gold_inventory = row[1]
+                barrel_cost = 0
                 if row and num_green_potions_inventory < 10 and gold_inventory >= barrel.price:
                     # if the number of green potions is less than 10 and gold in inventory is 
                     # sufficient, request a new barrel
                     request_quantity = 1
+                    barrel_cost = request_quantity * barrel.price
                     result = connection.execute(update_gold_expression, {
-                        "barrel_cost": request_quantity * barrel.price
+                        "barrel_cost": barrel_cost
                     }) 
-                print(f"Requested {request_quantity} small green barrel. Deducted gold by {request_quantity * barrel.price}")
+                print(f"Requested {request_quantity} small green barrel(s). Deducted gold by {barrel_cost}")
 
     return [
         {
