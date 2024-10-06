@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends
 from enum import Enum
 from pydantic import BaseModel
 from src.api import auth
+from src.util import INVENTORY_TABLE_NAME, INVENTORY_ML_TYPES, INVENTORY_POTION_TYPES, POTION_TYPES, get_potion_type_bottle, get_potion_type_from_ml 
 
-
-INVENTORY_TABLE_NAME = "global_inventory"
 
 router = APIRouter(
     prefix="/bottler",
@@ -19,20 +18,22 @@ class PotionInventory(BaseModel):
     potion_type: list[int]
     quantity: int
 
+
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
-    update_expression = sqlalchemy.text(f"""
-        UPDATE {INVENTORY_TABLE_NAME} 
-        SET num_green_potions = num_green_potions + :quantity
-    """)
-    
     for potion_inventory in potions_delivered:
+        potion_type = get_potion_type_bottle(potion_inventory.potion_type)
+        update_expression = sqlalchemy.text(f"""
+        UPDATE {INVENTORY_TABLE_NAME} 
+        SET {potion_type} = {potion_type} + :quantity
+        """)
         with db.engine.begin() as connection:
             connection.execute(update_expression, {
                 "quantity": potion_inventory.quantity
             })
     print(f"potions delievered: {potions_delivered} order_id: {order_id}")
     return "OK"
+
 
 @router.post("/plan")
 def get_bottle_plan():
@@ -44,37 +45,31 @@ def get_bottle_plan():
     # green potion to add.
     # Expressed in integers from 1 to 100 that must sum up to 100.
 
-    # Initial logic: bottle all barrels into red potions.
-    # Version 1 Logic: bottle all barrels into green potions
+    # Version 2 Logic: bottle all ml of each barrel into its respective potion type
 
-    select_expression = f"SELECT num_green_ml FROM {INVENTORY_TABLE_NAME}"
-    update_expression = sqlalchemy.text(f"""
-        UPDATE {INVENTORY_TABLE_NAME} 
-        SET num_green_ml = num_green_ml - :ml
-    """)
-
-    green_potion_quantity = 0
+    requests = []
     
-    with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(select_expression))
-        row = result.fetchone()
-        num_green_ml = row[0]
-        if num_green_ml >= 100:
-            green_potion_quantity = math.floor(num_green_ml/100)
-            ml_used = green_potion_quantity * 100
-            connection.execute(update_expression, {
-                "ml": ml_used
-            }) 
-        else:
-            print(f"Not enough green ml for mixing potion")
-    print(f"Bottle Plan: make {green_potion_quantity} green potions")
+    for ml_type in INVENTORY_ML_TYPES:
+        with db.engine.begin() as connection:
+            select_expression = f"SELECT {ml_type} FROM {INVENTORY_TABLE_NAME}"
+            update_expression = sqlalchemy.text(f"""
+            UPDATE {INVENTORY_TABLE_NAME} 
+            SET {ml_type} = {ml_type} - :ml
+            """)
+            result = connection.execute(sqlalchemy.text(select_expression))
+            row = result.fetchone()
+            num_ml = row[0]
+            if num_ml >= 100:
+                potion_quantity = math.floor(num_ml/100)
+                ml_used = potion_quantity * 100
+                connection.execute(update_expression, {
+                    "ml": ml_used
+                }) 
+                requests.append(PotionInventory(get_potion_type_from_ml(ml_type), potion_quantity))
+            else:
+                print(f"Not enough ml for mixing potion")
 
-    return [
-            {
-                "potion_type": [0, 100, 0, 0],
-                "quantity": green_potion_quantity,
-            }
-        ]
+    return requests
 
 if __name__ == "__main__":
     print(get_bottle_plan())

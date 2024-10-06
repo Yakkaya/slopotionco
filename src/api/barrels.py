@@ -3,10 +3,8 @@ from src import database as db
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from src.api import auth
+from src.util import INVENTORY_TABLE_NAME, INVENTORY_ML_TYPES, INVENTORY_POTION_TYPES, get_ml_attribute_from_sku, get_potion_type_barrel 
 
-INVENTORY_TABLE_NAME = "global_inventory"
-INVENTORY_ML_TYPES = ["num_green_ml", "num_red_ml", "num_blue_ml", "num_dark_ml"]
-INVENTORY_POTION_TYPES = ["num_green_potions", "num_red_potions", "num_blue_potions", "num_dark_potions"]
 
 router = APIRouter(
     prefix="/barrels",
@@ -52,7 +50,6 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     return "OK"
 
 
-
 # Gets called once a day
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[PurchaseRequest]:
@@ -60,10 +57,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
     print(wholesale_catalog)
 
     for barrel in wholesale_catalog:
-        potion_type_to_check = get_potion_type_from_sku(barrel.sku) 
+        inventory_potion_type = get_inventory_potion_type(barrel.potion_type) 
         select_expression = f"SELECT {potion_type_to_check}, gold FROM {INVENTORY_TABLE_NAME}"
         with db.engine.begin() as connection:
-            potion_type_to_check = get_potion_type(barrel.potion_type)
             result = connection.execute(sqlalchemy.text(select_expression))
             row = result.fetchone()
             potion_inventory = row[0]
@@ -78,29 +74,3 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
                 requests.append(purchase_request)
     print(requests)
     return requests
-
-
-def get_ml_attribute_from_sku(barrel_sku: str) -> str:
-    if "red" in barrel_sku.lower():
-        return INVENTORY_ML_TYPES[1]
-    elif "green" in barrel_sku.lower():
-        return INVENTORY_ML_TYPES[0]
-    elif "blue" in barrel_sku.lower():
-        return INVENTORY_ML_TYPES[2]
-    elif "dark" in barrel_sku.lower():
-        return INVENTORY_ML_TYPES[3]
-    else:
-        raise ValueError(f"Invalid SKU: {barrel_sku} does not contain a valid color")
-
-
-def get_potion_type(potion_type: list[int]) -> str:
-    if potion_type == [1, 0, 0, 0]:
-        return INVENTORY_POTION_TYPES[1]
-    elif potion_type == [0, 1, 0, 0]:
-        return INVENTORY_POTION_TYPES[0]
-    elif potion_type == [0, 0, 1, 0]:
-        return INVENTORY_POTION_TYPES[2]
-    elif potion_type == [0, 0, 0, 1]:
-        return INVENTORY_POTION_TYPES[3]
-    else:
-        raise ValueError(f"Invalid potion type: {potion_type} is not a valid potion type")

@@ -84,6 +84,7 @@ def search_orders(
     start = int(search_page) * 5
     end = start + 5
 
+    print("Search page: %s", search_page)
     return {
         "previous": int(search_page) - 1 if int(search_page) > 0 else None,
         "next": int(search_page) + 1 if len(results[start:end]) == 5 else None,
