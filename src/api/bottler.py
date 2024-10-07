@@ -65,7 +65,7 @@ def get_bottle_plan():
                 connection.execute(update_expression, {
                     "ml": ml_used
                 }) 
-                requests.append(PotionInventory(get_potion_type_from_ml(ml_type), potion_quantity))
+                requests.append(PotionInventory(potion_type=get_potion_type_from_ml(ml_type), quantity=potion_quantity))
             else:
                 print(f"Not enough ml for mixing potion")
 

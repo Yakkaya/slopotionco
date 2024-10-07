@@ -1,3 +1,4 @@
+# Global Inventory
 INVENTORY_TABLE_NAME = "global_inventory"
 INVENTORY_ML_TYPES = ["num_green_ml", "num_red_ml", "num_blue_ml", "num_dark_ml"]
 INVENTORY_POTION_TYPES = ["num_green_potions", "num_red_potions", "num_blue_potions", "num_dark_potions"]
@@ -7,6 +8,17 @@ POTION_TYPES = [
     [0, 0, 100, 0],  # Blue potion
     [0, 0, 0, 100]   # Dark potion
 ]
+
+# Catalog Items
+CATALOG_TABLE_NAME = "catalog_items"
+POTION_SKUS = ["GREEN_POTION_0", "RED_POTION_0", "BLUE_POTION_0", "DARK_POTION_0"]
+POTION_NAMES = ["green potion", "red potion", "blue potion", "dark potion"]
+POTION_SKU_TO_INVENTORY_TYPE_MAP = {
+    "GREEN_POTION_0": "num_green_potions",
+    "RED_POTION_0": "num_red_potions",
+    "BLUE_POTION_0": "num_blue_potions",
+    "DARK_POTION_0": "num_dark_potions"
+}
 
 def get_ml_attribute_from_sku(barrel_sku: str) -> str:
     if "red" in barrel_sku.lower():
@@ -49,12 +61,12 @@ def get_potion_type_bottle(potion_type: list[int]) -> str:
 
 def get_potion_type_from_ml(ml_type: str) -> str:
     if ml_type == INVENTORY_ML_TYPES[0]:
-        return INVENTORY_POTION_TYPES[0]
+        return POTION_TYPES[0]
     elif ml_type == INVENTORY_ML_TYPES[1]:
-        return INVENTORY_POTION_TYPES[1]
+        return POTION_TYPES[1]
     elif ml_type == INVENTORY_ML_TYPES[2]:
-        return INVENTORY_POTION_TYPES[2]
+        return POTION_TYPES[2]
     elif ml_type == INVENTORY_ML_TYPES[3]:
-        return INVENTORY_POTION_TYPES[3]
+        return POTION_TYPES[3]
     else:
-        raise ValueError(f"Invalid ml type: {ml_type} is not a valid ml type")
+        raise ValueError(f"Invalid ml type: {ml_type} is not a valid ml type") 

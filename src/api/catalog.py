@@ -2,7 +2,7 @@ import sqlalchemy
 from src import database as db
 from fastapi import APIRouter
 from pydantic import BaseModel
-from src.util import INVENTORY_TABLE_NAME, INVENTORY_POTION_TYPES, POTION_TYPES
+from src.util import INVENTORY_TABLE_NAME, CATALOG_TABLE_NAME, INVENTORY_POTION_TYPES, POTION_TYPES, POTION_SKUS, POTION_NAMES
 
 router = APIRouter()
 
@@ -53,7 +53,7 @@ def get_catalog():
                 insert_query = f"""
                 INSERT INTO {CATALOG_TABLE_NAME} (sku, name, quantity, price, potion_type)
                 VALUES (:sku, :name, :quantity, :price, :potion_type)
-                ON CONFLICT (name) 
+                ON CONFLICT (sku) 
                 DO UPDATE SET quantity = EXCLUDED.quantity;
                 """
                 connection.execute(sqlalchemy.text(insert_query), {

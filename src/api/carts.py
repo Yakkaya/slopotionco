@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
 from src.api.catalog import CatalogItem
+from src.util import INVENTORY_TABLE_NAME, CATALOG_TABLE_NAME, POTION_SKUS, POTION_NAMES, POTION_SKU_TO_INVENTORY_TYPE_MAP
 from enum import Enum
 
 router = APIRouter(
@@ -11,8 +12,6 @@ router = APIRouter(
     tags=["cart"],
     dependencies=[Depends(auth.get_api_key)],
 )
-
-INVENTORY_TABLE_NAME = "global_inventory"
 
 class search_sort_options(str, Enum):
     customer_name = "customer_name"
@@ -141,21 +140,41 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     items = cart["items"]
     
     total_potions_bought = sum(item["quantity"] for item in items)
-    total_gold_paid = total_potions_bought * 50 
+    total_gold_paid = 0
     
     with db.engine.begin() as connection:
         for item in items:
-            # Version 1: only updating green potion inventory
-            if item["sku"] == "GREEN_POTION_0":
-                update_expression = sqlalchemy.text(f"""
-                    UPDATE {INVENTORY_TABLE_NAME}
-                    SET num_green_potions = num_green_potions - :quantity, gold = gold + :total_gold_paid
-                """)
-                
-                result = connection.execute(update_expression, {
-                    "quantity": item["quantity"],
-                    "total_gold_paid": total_gold_paid
-                })
+            potion_sku = item["sku"]
+            quantity = item["quantity"]
+            
+            select_expression = f"""
+                SELECT price FROM {CATALOG_TABLE_NAME}
+                WHERE sku = :sku
+            """
+            result = connection.execute(sqlalchemy.text(select_expression), {"sku": potion_sku})
+            catalog_row = result.fetchone()
+
+            if not catalog_row:
+                return {"error": f"SKU not found in catalog: {potion_sku}"}
+
+            price = catalog_row[0]
+            
+            total_gold_for_item = price * quantity
+            total_gold_paid += total_gold_for_item
+
+            inventory_column = POTION_SKU_TO_INVENTORY_TYPE_MAP[potion_sku]
+            
+            # Update the inventory for the specific potion type using the dynamic inventory column
+            update_expression = sqlalchemy.text(f"""
+                UPDATE {INVENTORY_TABLE_NAME}
+                SET {inventory_column} = {inventory_column} - :quantity, 
+                    gold = gold + :total_gold_for_item
+            """)
+            
+            connection.execute(update_expression, {
+                "quantity": quantity,
+                "total_gold_for_item": total_gold_for_item
+            })
 
     order_id = len(order_store) + 1
     order_store[order_id] = {
@@ -164,4 +183,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         "total_gold_paid": total_gold_paid
     }
     
-    return {"total_potions_bought": total_potions_bought, "total_gold_paid": total_gold_paid}
+    return {
+        "total_potions_bought": total_potions_bought,
+        "total_gold_paid": total_gold_paid
+    }
