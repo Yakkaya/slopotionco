@@ -58,7 +58,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
 
     for barrel in wholesale_catalog:
         inventory_potion_type = get_potion_type_barrel(barrel.potion_type) 
-        select_expression = f"SELECT {potion_type_to_check}, gold FROM {INVENTORY_TABLE_NAME}"
+        select_expression = f"SELECT {inventory_potioon_type}, gold FROM {INVENTORY_TABLE_NAME}"
         with db.engine.begin() as connection:
             result = connection.execute(sqlalchemy.text(select_expression))
             row = result.fetchone()
