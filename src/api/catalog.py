@@ -53,6 +53,8 @@ def get_catalog():
                 insert_query = f"""
                 INSERT INTO {CATALOG_TABLE_NAME} (sku, name, quantity, price, potion_type)
                 VALUES (:sku, :name, :quantity, :price, :potion_type)
+                ON CONFLICT (name) 
+                DO UPDATE SET quantity = EXCLUDED.quantity;
                 """
                 connection.execute(sqlalchemy.text(insert_query), {
                     "sku": item.sku,
