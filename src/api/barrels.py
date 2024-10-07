@@ -56,15 +56,21 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
     requests = []
     print(wholesale_catalog)
 
+    select_gold_expression = f"SELECT gold FROM {INVENTORY_TABLE_NAME}" 
+    gold_plan = 0
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(select_gold_expression))
+        row = result.fetchone() 
+        gold_plan = row[0]
+
     for barrel in wholesale_catalog:
         inventory_potion_type = get_potion_type_barrel(barrel.potion_type) 
-        select_expression = f"SELECT {inventory_potion_type}, gold FROM {INVENTORY_TABLE_NAME}"
+        select_expression = f"SELECT {inventory_potion_type} FROM {INVENTORY_TABLE_NAME}"
         with db.engine.begin() as connection:
             result = connection.execute(sqlalchemy.text(select_expression))
             row = result.fetchone()
             potion_inventory = row[0]
-            gold_inventory = row[1]
-            if potion_inventory < 10 and gold_inventory >= barrel.price:
+            if potion_inventory < 10 and gold_plan >= barrel.price:
                 # if the number of this potion type is less than 10 and gold in inventory is 
                 # sufficient, request a new barrel
                 request_quantity = 1
@@ -75,6 +81,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
                     sku=barrel.sku,
                     quantity=request_quantity
                 )
+                gold_plan -= barrel.price
                 requests.append(purchase_request)
     print(requests)
     return requests
