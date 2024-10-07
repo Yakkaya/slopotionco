@@ -67,15 +67,14 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
             if potion_inventory < 10 and gold_inventory >= barrel.price:
                 # if the number of this potion type is less than 10 and gold in inventory is 
                 # sufficient, request a new barrel
-                request_quantity = 20 - potion_inventory
-                max_affordable_quantity = gold_inventory // barrel.price
-                request_quantity = min(request_quantity, max_affordable_quantity)
-
-                if request_quantity > 0:
-                    purchase_request = PurchaseRequest(
-                        sku=barrel.sku,
-                        quantity=request_quantity
-                    )
-                    requests.append(purchase_request)
+                request_quantity = 1
+                # request_quantity = 20 - potion_inventory
+                # max_affordable_quantity = gold_inventory // barrel.price
+                # request_quantity = min(request_quantity, max_affordable_quantity)
+                purchase_request = PurchaseRequest(
+                    sku=barrel.sku,
+                    quantity=request_quantity
+                )
+                requests.append(purchase_request)
     print(requests)
     return requests
