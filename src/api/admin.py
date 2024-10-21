@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
 
-INVENTORY_TABLE_NAME = "global_inventory"
 
 router = APIRouter(
     prefix="/admin",
@@ -18,17 +17,30 @@ def reset():
     Reset the game state. Gold goes to 100, all potions are removed from
     inventory, and all barrels are removed from inventory. Carts are all reset.
     """
-    update_expression = f"""UPDATE {INVENTORY_TABLE_NAME} SET num_green_potions = 0, 
-    num_green_ml = 0,
-    num_blue_potions = 0, 
-    num_blue_ml = 0, 
-    num_red_potions = 0, 
-    num_red_ml = 0,  
-    num_dark_potions = 0,
-    num_dark_ml = 0,
-    gold = 100"""
-    
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(update_expression))
-    return "OK"
+        # 1. Reset gold to 100 in the global inventory
+        reset_gold_query = """
+        UPDATE global_inventory
+        SET gold = 100;
+        """
+        connection.execute(sqlalchemy.text(reset_gold_query))
+
+        # 2. Set potion quantities to 0 in catalog items
+        reset_potions_query = """
+        UPDATE catalog_items
+        SET quantity = 0;
+        """
+        connection.execute(sqlalchemy.text(reset_potions_query))
+
+        # 3. Reset carts and cart items
+        delete_cart_items_query = """
+        DELETE FROM cart_items;
+        """
+        connection.execute(sqlalchemy.text(delete_cart_items_query))
+
+        delete_carts_query = """
+        DELETE FROM carts;
+        """
+        connection.execute(sqlalchemy.text(delete_carts_query))
+    return {"success": True, "message": "Game state has been reset"}
 
