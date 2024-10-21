@@ -19,31 +19,23 @@ def get_inventory():
     """
     Retrieve and audit the current inventory, including potions, milliliters, and gold.
     """
-    select_expression_inventory = f"SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml, gold FROM {INVENTORY_TABLE_NAME}"
-    select_expression_catalog = f"SELECT pt.sku, ci.quantity FROM catalog_items ci JOIN potion_types pt ON ci.potion_type_id = pt.id"
+    select_expression_inventory = f"SELECT gold, (num_red_ml + num_green_ml + num_blue_ml + num_dark_ml) AS total_ml FROM {INVENTORY_TABLE_NAME}"
+    select_expression_catalog = f"SELECT SUM(quantity) AS total_potions FROM catalog_items"
     
     with db.engine.begin() as connection:
         # Get milliliters and gold from inventory table
         result_inventory = connection.execute(sqlalchemy.text(select_expression_inventory))
         row_inventory = result_inventory.fetchone()
-        num_red_ml_inventory = row_inventory[0]
-        num_green_ml_inventory = row_inventory[1]
-        num_blue_ml_inventory = row_inventory[2]
-        num_dark_ml_inventory = row_inventory[3]
-        gold_inventory = row_inventory[4]
+        ml_inventory = row_inventory[1]
+        gold_inventory = row_inventory[0]
         
         # Get potion quantities for each potion type from catalog items table
         result_catalog = connection.execute(sqlalchemy.text(select_expression_catalog))
-        potions_inventory = {row[0]: row[1] for row in result_catalog}
+        potions_inventory = result_catalog.fetchone()[0]
     
     return {
         "potions": potions_inventory,
-        "ml_in_barrels": {
-            "red": num_red_ml_inventory,
-            "green": num_green_ml_inventory,
-            "blue": num_blue_ml_inventory,
-            "dark": num_dark_ml_inventory
-        },
+        "ml_in_barrels": ml_inventory,
         "gold": gold_inventory
     }
 
