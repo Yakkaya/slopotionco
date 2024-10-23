@@ -86,15 +86,17 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             element_usage["blue"] += blue_ml * potion_inventory.quantity
             element_usage["dark"] += dark_ml * potion_inventory.quantity
 
-            # Update the catalog for the matching potion type
-            update_catalog_query = sqlalchemy.text("""
-                UPDATE catalog_items
-                SET quantity = quantity + :quantity
-                WHERE potion_type_id = :potion_type_id
+            # Insert / Update the catalog for the matching potion type
+            insert_or_update_query = sqlalchemy.text("""
+                INSERT INTO catalog_items (potion_type_id, quantity)
+                VALUES (:potion_type_id, :quantity)
+                ON CONFLICT (potion_type_id)
+                DO UPDATE SET quantity = catalog_items.quantity + EXCLUDED.quantity
             """)
-            connection.execute(update_catalog_query, {
-                "quantity": potion_inventory.quantity,
-                "potion_type_id": potion_type_id
+
+            connection.execute(insert_or_update_query, {
+                "potion_type_id": potion_type_id,
+                "quantity": potion_inventory.quantity
             })
 
         # Fetch current global inventory to ensure enough ml is available

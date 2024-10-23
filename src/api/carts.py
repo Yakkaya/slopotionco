@@ -239,6 +239,16 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 "quantity": quantity,
                 "potion_type_id": potion_type_id
             })
+
+            # Remove the row if the quantity reaches 0
+            delete_zero_quantity_query = sqlalchemy.text("""
+                DELETE FROM catalog_items
+                WHERE id = :potion_type_id AND quantity <= 0
+            """)
+
+            connection.execute(delete_zero_quantity_query, {
+                "potion_type_id": potion_type_id
+            })
         
         # Update the global inventory gold after successful checkout
         update_gold_query = sqlalchemy.text("""

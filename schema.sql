@@ -48,17 +48,6 @@ CREATE TABLE catalog_items (
     quantity INT DEFAULT 0                          -- Quantity of the potion in stock
 );
 
--- Populate with initial values
-INSERT INTO catalog_items (potion_type_id, quantity)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'GREEN_POTION_0'), 0),
-((SELECT id FROM potion_types WHERE sku = 'RED_POTION_0'), 0),
-((SELECT id FROM potion_types WHERE sku = 'BLUE_POTION_0'), 0),
-((SELECT id FROM potion_types WHERE sku = 'DARK_POTION_0'), 0),
-((SELECT id FROM potion_types WHERE sku = 'TURQUOISE_POTION_0'), 0),
-((SELECT id FROM potion_types WHERE sku = 'RAINBOW_POTION_0'), 0);
-
-
 -------------------------
 -- POTION COMPOSITIONS --
 -------------------------

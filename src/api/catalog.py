@@ -54,6 +54,7 @@ def get_catalog():
                     potion_type_percentages[element_map[element]] = percentage
 
             # Create the CatalogItem instance
+
             catalog_item = CatalogItem(
                 sku=row[0],
                 name=row[1],
