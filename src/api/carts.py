@@ -3,8 +3,6 @@ from src import database as db
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
-from src.api.catalog import CatalogItem
-from src.util import CATALOG_TABLE_NAME
 from enum import Enum
 
 router = APIRouter(
@@ -13,13 +11,13 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
-class search_sort_options(str, Enum):
+class SearchSortOptions(str, Enum):
     customer_name = "customer_name"
     item_sku = "item_sku"
     line_item_total = "line_item_total"
     timestamp = "timestamp"
 
-class search_sort_order(str, Enum):
+class SearchSortOrder(str, Enum):
     asc = "asc"
     desc = "desc"
 
@@ -35,35 +33,13 @@ def search_orders(
     customer_name: str = "",
     potion_sku: str = "",
     search_page: str = "",
-    sort_col: search_sort_options = search_sort_options.timestamp,
-    sort_order: search_sort_order = search_sort_order.desc,
+    sort_col: SearchSortOptions = SearchSortOptions.timestamp,
+    sort_order: SearchSortOrder = SearchSortOrder.desc,
 ):
     """
     Search for cart line items by customer name and/or potion sku.
-
-    Customer name and potion sku filter to orders that contain the 
-    string (case insensitive). If the filters aren't provided, no
-    filtering occurs on the respective search term.
-
-    Search page is a cursor for pagination. The response to this
-    search endpoint will return previous or next if there is a
-    previous or next page of results available. The token passed
-    in that search response can be passed in the next search request
-    as search page to get that page of results.
-
-    Sort col is which column to sort by and sort order is the direction
-    of the search. They default to searching by timestamp of the order
-    in descending order.
-
-    The response itself contains a previous and next page token (if
-    such pages exist) and the results as an array of line items. Each
-    line item contains the line item id (must be unique), item sku, 
-    customer name, line item total (in gold), and timestamp of the order.
-    Your results must be paginated, the max results you can return at any
-    time is 5 total line items.
     """
-
-    # simulate searching through orders
+    # Simulate searching through orders (pagination limit: 5 results per page)
     results = [
         OrderLineItem(
             line_item_id=1,
@@ -77,7 +53,6 @@ def search_orders(
     start = int(search_page) * 5
     end = start + 5
 
-    print("Search page: %s", search_page)
     return {
         "previous": int(search_page) - 1 if int(search_page) > 0 else None,
         "next": int(search_page) + 1 if len(results[start:end]) == 5 else None,
@@ -92,7 +67,7 @@ class Customer(BaseModel):
 @router.post("/visits/{visit_id}")
 def post_visits(visit_id: int, customers: list[Customer]):
     """
-    Which customers visited the shop today?
+    Track which customers visited the shop today.
     """
     print(f"Visit {visit_id} Customers: {customers}")
     return {"success": True}
@@ -103,7 +78,6 @@ def create_cart(new_cart: Customer):
     Create a new cart for the customer and store it in the database.
     """
     with db.engine.begin() as connection:
-        # Insert the new cart into the `carts` table
         insert_cart_query = sqlalchemy.text("""
             INSERT INTO carts (customer_name) 
             VALUES (:customer_name)
@@ -131,18 +105,16 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
         if not result.fetchone():
             return {"error": "Cart not found"}
 
-        # Check if the item exists in the catalog_items table by joining with potion_types to get SKU
-        select_catalog_item_query = sqlalchemy.text("""
-            SELECT ci.id, pt.price FROM catalog_items ci
-            JOIN potion_types pt ON ci.potion_type_id = pt.id
-            WHERE pt.sku = :item_sku
+        # Check if the item exists in the potion_types table by SKU
+        select_potion_query = sqlalchemy.text("""
+            SELECT id, price FROM potion_types WHERE sku = :item_sku
         """)
-        result = connection.execute(select_catalog_item_query, {"item_sku": item_sku})
-        catalog_item = result.fetchone()
-        if not catalog_item:
-            return {"error": "Item not found in catalog_items"}
+        result = connection.execute(select_potion_query, {"item_sku": item_sku})
+        potion = result.fetchone()
+        if not potion:
+            return {"error": "Item not found in potion_types"}
 
-        catalog_item_id, item_price = catalog_item
+        potion_type_id, item_price = potion
 
         # Check if the item already exists in the cart_items table
         select_cart_item_query = sqlalchemy.text("""
@@ -151,7 +123,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
         """)
         result = connection.execute(select_cart_item_query, {
             "cart_id": cart_id,
-            "potion_type_id": catalog_item_id
+            "potion_type_id": potion_type_id
         })
         existing_item = result.fetchone()
 
@@ -164,7 +136,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
             """)
             connection.execute(update_item_query, {
                 "cart_id": cart_id,
-                "potion_type_id": catalog_item_id,
+                "potion_type_id": potion_type_id,
                 "quantity": cart_item.quantity
             })
         else:
@@ -175,16 +147,12 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
             """)
             connection.execute(insert_item_query, {
                 "cart_id": cart_id,
-                "potion_type_id": catalog_item_id,
+                "potion_type_id": potion_type_id,
                 "quantity": cart_item.quantity,
                 "price": item_price
             })
 
     return {"success": True}
-
-
-
-
 
 class CartCheckout(BaseModel):
     payment: str
@@ -208,7 +176,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         select_items_query = sqlalchemy.text("""
             SELECT ci.potion_type_id, ci.quantity, ci.price, cat.quantity as available_quantity, pt.sku
             FROM cart_items ci
-            JOIN catalog_items cat ON ci.potion_type_id = cat.id
+            JOIN catalog_items cat ON cat.potion_type_id = ci.potion_type_id
             JOIN potion_types pt ON cat.potion_type_id = pt.id
             WHERE ci.cart_id = :cart_id
         """)
@@ -233,7 +201,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             update_catalog_query = sqlalchemy.text("""
                 UPDATE catalog_items
                 SET quantity = quantity - :quantity
-                WHERE id = :potion_type_id
+                WHERE potion_type_id = :potion_type_id
             """)
             connection.execute(update_catalog_query, {
                 "quantity": quantity,
@@ -243,9 +211,8 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             # Remove the row if the quantity reaches 0
             delete_zero_quantity_query = sqlalchemy.text("""
                 DELETE FROM catalog_items
-                WHERE id = :potion_type_id AND quantity <= 0
+                WHERE potion_type_id = :potion_type_id AND quantity <= 0
             """)
-
             connection.execute(delete_zero_quantity_query, {
                 "potion_type_id": potion_type_id
             })
@@ -270,3 +237,4 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         "total_gold_paid": total_gold_paid,
         "message": "Checkout successful"
     }
+
