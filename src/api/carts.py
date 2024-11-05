@@ -39,7 +39,7 @@ def search_orders(
     """
     Search for cart line items by customer name and/or potion sku.
     """
-    # Simulate searching through orders (pagination limit: 5 results per page)
+    # simulate searching through orders (pagination limit: 5 results per page)
     results = [
         OrderLineItem(
             line_item_id=1,
@@ -97,7 +97,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     Add an item to the cart by SKU and quantity.
     """
     with db.engine.begin() as connection:
-        # Check if the cart exists
+        # check if the cart exists
         select_cart_query = sqlalchemy.text("""
             SELECT id FROM carts WHERE id = :cart_id
         """)
@@ -105,7 +105,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
         if not result.fetchone():
             return {"error": "Cart not found"}
 
-        # Check if the item exists in the potion_types table by SKU
+        # check if the item exists in the potion_types table by SKU
         select_potion_query = sqlalchemy.text("""
             SELECT id, price FROM potion_types WHERE sku = :item_sku
         """)
@@ -116,7 +116,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
 
         potion_type_id, item_price = potion
 
-        # Check if the item already exists in the cart_items table
+        # check if the item already exists in the cart_items table
         select_cart_item_query = sqlalchemy.text("""
             SELECT quantity FROM cart_items
             WHERE cart_id = :cart_id AND potion_type_id = :potion_type_id
@@ -128,7 +128,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
         existing_item = result.fetchone()
 
         if existing_item:
-            # If the item exists, update the quantity
+            # if the item exists, update the quantity
             update_item_query = sqlalchemy.text("""
                 UPDATE cart_items
                 SET quantity = quantity + :quantity
@@ -140,7 +140,7 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
                 "quantity": cart_item.quantity
             })
         else:
-            # If the item does not exist, insert it
+            # if the item does not exist, insert it
             insert_item_query = sqlalchemy.text("""
                 INSERT INTO cart_items (cart_id, potion_type_id, quantity, price)
                 VALUES (:cart_id, :potion_type_id, :quantity, :price)
@@ -163,7 +163,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     Perform checkout for the cart, calculate total cost, and update catalog inventory.
     """
     with db.engine.begin() as connection:
-        # Check if the cart exists
+        # check if the cart exists
         select_cart_query = sqlalchemy.text("""
             SELECT customer_name FROM carts WHERE id = :cart_id
         """)
@@ -172,12 +172,11 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         if not cart:
             return {"error": "Cart not found"}
 
-        # Retrieve cart items and calculate total cost
+        # retrieve cart items and calculate total cost
         select_items_query = sqlalchemy.text("""
-            SELECT ci.potion_type_id, ci.quantity, ci.price, cat.quantity as available_quantity, pt.sku
+            SELECT ci.potion_type_id, ci.quantity, ci.price, pt.sku
             FROM cart_items ci
-            JOIN catalog_items cat ON cat.potion_type_id = ci.potion_type_id
-            JOIN potion_types pt ON cat.potion_type_id = pt.id
+            JOIN potion_types pt ON ci.potion_type_id = pt.id
             WHERE ci.cart_id = :cart_id
         """)
         cart_items = connection.execute(select_items_query, {"cart_id": cart_id}).fetchall()
@@ -189,52 +188,35 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         total_gold_paid = 0
 
         for item in cart_items:
-            potion_type_id, quantity, price, available_quantity, sku = item
-            if quantity > available_quantity:
-                return {"error": f"Not enough inventory for SKU {sku}. Available: {available_quantity}, Requested: {quantity}"}
-
+            potion_type_id, quantity, price, sku = item
             total_gold_for_item = price * quantity
             total_gold_paid += total_gold_for_item
             total_potions_bought += quantity
 
-            # Update the catalog inventory for each item
-            update_catalog_query = sqlalchemy.text("""
-                UPDATE catalog_items
-                SET quantity = quantity - :quantity
-                WHERE potion_type_id = :potion_type_id
+            # insert a ledger entry for the purchased items
+            insert_ledger_entry = sqlalchemy.text("""
+                INSERT INTO inventory_ledger (
+                    transaction_type, potion_type_id, potion_quantity_change, gold_change
+                )
+                VALUES ('purchase', :potion_type_id, -:quantity, :gold_change)
             """)
-            connection.execute(update_catalog_query, {
+            connection.execute(insert_ledger_entry, {
+                "potion_type_id": potion_type_id,
                 "quantity": quantity,
-                "potion_type_id": potion_type_id
-            })
-
-            # Remove the row if the quantity reaches 0
-            delete_zero_quantity_query = sqlalchemy.text("""
-                DELETE FROM catalog_items
-                WHERE potion_type_id = :potion_type_id AND quantity <= 0
-            """)
-            connection.execute(delete_zero_quantity_query, {
-                "potion_type_id": potion_type_id
+                "gold_change": total_gold_for_item
             })
         
-        # Update the global inventory gold after successful checkout
-        update_gold_query = sqlalchemy.text("""
-            UPDATE global_inventory
-            SET gold = gold + :total_gold_paid
+        # delete the cart items and the cart after successful checkout
+        delete_cart_and_items_query = sqlalchemy.text("""
+            DELETE FROM cart_items WHERE cart_id = :cart_id;
+            DELETE FROM carts WHERE id = :cart_id;
         """)
-        connection.execute(update_gold_query, {
-            "total_gold_paid": total_gold_paid
-        })
-
-        # Delete the cart items after successful checkout
-        delete_cart_items_query = sqlalchemy.text("""
-            DELETE FROM cart_items WHERE cart_id = :cart_id
-        """)
-        connection.execute(delete_cart_items_query, {"cart_id": cart_id})
+        connection.execute(delete_cart_and_items_query, {"cart_id": cart_id})
 
     return {
         "total_potions_bought": total_potions_bought,
         "total_gold_paid": total_gold_paid,
         "message": "Checkout successful"
     }
+
 

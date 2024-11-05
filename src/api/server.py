@@ -8,17 +8,17 @@ import sys
 from starlette.middleware.cors import CORSMiddleware
 
 description = """
-Central Coast Cauldrons is the premier ecommerce site for all your alchemical desires.
+slopotionco is the premier ecommerce site for all your alchemical desires.
 """
 
 app = FastAPI(
-    title="Central Coast Cauldrons",
+    title="slopotionco",
     description=description,
     version="0.0.1",
     terms_of_service="http://example.com/terms/",
     contact={
-        "name": "Lucas Pierce",
-        "email": "lupierce@calpoly.edu",
+        "name": "Yasemin Akkaya",
+        "email": "yakkaya@calpoly.edu",
     },
 )
 

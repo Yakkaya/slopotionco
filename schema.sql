@@ -3,101 +3,36 @@
 ---------------------------------
 
 ----------------------
--- GLOBAL INVENTORY --
------------------------
--- This table tracks the available milliliters of each element (red, blue, green, dark) and gold
-CREATE TABLE global_inventory (
-    id SERIAL PRIMARY KEY,
-    num_red_ml INT DEFAULT 0,   -- Available milliliters of red element
-    num_blue_ml INT DEFAULT 0,  -- Available milliliters of blue element
-    num_green_ml INT DEFAULT 0, -- Available milliliters of green element
-    num_dark_ml INT DEFAULT 0,  -- Available milliliters of dark element
-    gold INT DEFAULT 0         -- Global gold
-);
-
-
-----------------------
 -- POTION TYPES --
 -----------------------
 -- Defines each potion type (SKU, name, and price)
 CREATE TABLE potion_types (
     id SERIAL PRIMARY KEY,
-    sku VARCHAR(50) UNIQUE NOT NULL, -- SKU for each potion (e.g., GREEN_POTION_0)
-    name VARCHAR(100) NOT NULL,      -- Potion name (e.g., 'green potion')
-    price INT DEFAULT 0              -- Potion price
+    sku VARCHAR(50) UNIQUE NOT NULL,  -- SKU for each potion (e.g., GREEN_POTION_0)
+    name VARCHAR(100) NOT NULL,       -- Potion name (e.g., 'green potion')
+    red INT DEFAULT 0,                -- Percentage of red for this potion type
+    green INT DEFAULT 0,              -- Percentage of green for this potion type
+    blue INT DEFAULT 0,               -- Percentage of blue for this potion type
+    dark INT DEFAULT 0,               -- Percentage of dark for this potion type
+    price INT DEFAULT 0               -- Potion price
 );
-
--- Initial values
-INSERT INTO potion_types (sku, name, price) 
-VALUES 
-('GREEN_POTION_0', 'Green Potion', 50),
-('RED_POTION_0', 'Red Potion', 50),
-('BLUE_POTION_0', 'Blue Potion', 50),
-('DARK_POTION_0', 'Dark Potion', 50),
-('TURQUOISE_POTION_0', 'Turquoise Potion', 60),
-('RAINBOW_POTION_0', 'Rainbow Potion', 70);
-
 
 ----------------------
--- CATALOG ITEMS --
+-- INVENTORY LEDGER --
 -----------------------
--- Tracks the quantity of each potion available in the catalog
-CREATE TABLE catalog_items (
-    id SERIAL PRIMARY KEY,
-    potion_type_id INT REFERENCES potion_types(id), -- References the potion in potion_types
-    quantity INT DEFAULT 0                          -- Quantity of the potion in stock
+-- Append-only ledger that records all changes to inventory
+CREATE TABLE inventory_ledger (
+    id SERIAL PRIMARY KEY,  -- Unique ID for each ledger entry
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Time of the transaction
+    transaction_type VARCHAR(50) NOT NULL,  -- Type of transaction ('bottling', 'purchase', 'barrel delivery', etc.)
+    potion_type_id INT REFERENCES potion_types(id),  -- Potion type that was affected (nullable if it's an element change)
+    num_red_ml_change INT DEFAULT 0,  -- Change in the number of red milliliters
+    num_blue_ml_change INT DEFAULT 0,  -- Change in the number of blue milliliters
+    num_green_ml_change INT DEFAULT 0,  -- Change in the number of green milliliters
+    num_dark_ml_change INT DEFAULT 0,  -- Change in the number of dark milliliters
+    gold_change INT DEFAULT 0,  -- Change in gold amount
+    potion_quantity_change INT DEFAULT 0  -- Change in potion quantity (+ for restock, - for sale)
 );
-
--------------------------
--- POTION COMPOSITIONS --
--------------------------
--- Tracks how each potion is composed of the four elements (red, blue, green, dark)
-CREATE TABLE potion_compositions (
-    id SERIAL PRIMARY KEY,
-    potion_type_id INT REFERENCES potion_types(id), -- References potion from potion_types
-    element VARCHAR(50) NOT NULL,                   -- Potion element (e.g., 'red', 'blue', 'green', 'dark')
-    percentage INT CHECK (percentage >= 0 AND percentage <= 100) -- Percentage of the element
-);
-
--- Potion Compositions: Define composition for each potion
--- Green Potion: 100% Green
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'GREEN_POTION_0'), 'green', 100);
-
--- Red Potion: 100% Red
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'RED_POTION_0'), 'red', 100);
-
--- Blue Potion: 100% Blue
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'BLUE_POTION_0'), 'blue', 100);
-
--- Dark Potion: 100% Dark
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'DARK_POTION_0'), 'dark', 100);
-
--- Turquoise Potion: 50% Green, 50% Blue
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'TURQUOISE_POTION_0'), 'green', 50),
-((SELECT id FROM potion_types WHERE sku = 'TURQUOISE_POTION_0'), 'blue', 50);
-
--- Rainbow Potion: 25% Red, 25% Green, 25% Blue, 25% Dark
-INSERT INTO potion_compositions (potion_type_id, element, percentage)
-VALUES
-((SELECT id FROM potion_types WHERE sku = 'RAINBOW_POTION_0'), 'red', 25),
-((SELECT id FROM potion_types WHERE sku = 'RAINBOW_POTION_0'), 'green', 25),
-((SELECT id FROM potion_types WHERE sku = 'RAINBOW_POTION_0'), 'blue', 25),
-((SELECT id FROM potion_types WHERE sku = 'RAINBOW_POTION_0'), 'dark', 25);
-
-
----------------------------------
------- ORDER MANAGEMENT ---------
----------------------------------
 
 
 -------------------------
@@ -120,3 +55,46 @@ CREATE TABLE cart_items (
     price INT NOT NULL,  -- Price of the item at the time it was added to the cart
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Time the item was added to the cart
 );
+
+-- Initial values for potion_types
+INSERT INTO potion_types (sku, name, red, green, blue, dark, price) 
+VALUES 
+('GREEN_POTION_0', 'Green Potion', 0, 100, 0, 0, 50),
+('RED_POTION_0', 'Red Potion', 100, 0, 0, 0, 50),
+('BLUE_POTION_0', 'Blue Potion', 0, 0, 100, 0, 50),
+('DARK_POTION_0', 'Dark Potion', 0, 0, 0, 100, 50),
+('TURQUOISE_POTION_0', 'Turquoise Potion', 0, 50, 50, 0, 5),
+('RAINBOW_POTION_0', 'Rainbow Potion', 25, 25, 25, 25, 5);
+
+
+----------------------
+-- GLOBAL INVENTORY VIEW --
+-----------------------
+-- This view provides the current inventory state by aggregating the ledger
+CREATE VIEW current_global_inventory AS
+SELECT 
+    SUM(num_red_ml_change) AS num_red_ml,
+    SUM(num_blue_ml_change) AS num_blue_ml,
+    SUM(num_green_ml_change) AS num_green_ml,
+    SUM(num_dark_ml_change) AS num_dark_ml,
+    SUM(gold_change) AS gold
+FROM 
+    inventory_ledger;
+
+
+----------------------
+-- CATALOG ITEMS VIEW --
+-----------------------
+-- Tracks the current quantity of each potion available in the catalog by aggregating the ledger
+CREATE VIEW current_catalog_items AS
+SELECT 
+    pt.id AS potion_type_id,
+    pt.sku,
+    pt.name,
+    SUM(il.potion_quantity_change) AS quantity
+FROM 
+    potion_types pt
+LEFT JOIN 
+    inventory_ledger il ON pt.id = il.potion_type_id
+GROUP BY 
+    pt.id, pt.sku, pt.name;

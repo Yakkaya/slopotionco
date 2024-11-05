@@ -3,9 +3,6 @@ from src import database as db
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from src.api import auth
-from src.util import INVENTORY_TABLE_NAME
-import math
-
 
 
 router = APIRouter(
@@ -19,17 +16,21 @@ def get_inventory():
     """
     Retrieve and audit the current inventory, including potions, milliliters, and gold.
     """
-    select_expression_inventory = f"SELECT gold, (num_red_ml + num_green_ml + num_blue_ml + num_dark_ml) AS total_ml FROM {INVENTORY_TABLE_NAME}"
-    select_expression_catalog = f"SELECT SUM(quantity) AS total_potions FROM catalog_items"
+    select_expression_inventory = f"""
+        SELECT COALESCE(SUM(gold_change), 0) AS gold, 
+               COALESCE(SUM(num_red_ml_change + num_green_ml_change + num_blue_ml_change + num_dark_ml_change), 0) AS total_ml
+        FROM inventory_ledger
+    """
+    select_expression_catalog = f"SELECT COALESCE(SUM(potion_quantity_change), 0) AS total_potions FROM inventory_ledger"
     
     with db.engine.begin() as connection:
-        # Get milliliters and gold from inventory table
+        # get milliliters and gold from inventory ledger
         result_inventory = connection.execute(sqlalchemy.text(select_expression_inventory))
         row_inventory = result_inventory.fetchone()
         ml_inventory = row_inventory[1]
         gold_inventory = row_inventory[0]
         
-        # Get potion quantities for each potion type from catalog items table
+        # get potion quantities for each potion type from inventory ledger
         result_catalog = connection.execute(sqlalchemy.text(select_expression_catalog))
         potions_inventory = result_catalog.fetchone()[0]
     
@@ -65,3 +66,4 @@ def deliver_capacity_plan(capacity_purchase : CapacityPurchase, order_id: int):
     """
 
     return "OK"
+
