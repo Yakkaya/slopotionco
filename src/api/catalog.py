@@ -23,6 +23,7 @@ def get_catalog():
         FROM {POTION_TYPES_TABLE_NAME} pt
         LEFT JOIN inventory_ledger il ON pt.id = il.potion_type_id
         GROUP BY pt.id, pt.sku, pt.name, pt.price, pt.red, pt.green, pt.blue, pt.dark
+        HAVING COALESCE(SUM(il.potion_quantity_change), 0) > 0
         """
         result = connection.execute(sqlalchemy.text(catalog_query))
         rows = result.fetchall()
