@@ -87,17 +87,27 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]) -> list[Purchas
             "num_blue_ml": row[3],
             "num_dark_ml": row[4]
         }
+    
+    # calculate target ml quantity to even out all ml types
+    total_ml = sum(ml_inventory.values())
+    num_types = len(ml_inventory)
+    target_ml = 100 if (total_ml / num_types) == 0 else (total_ml / num_types)
+
+    # sort barrels by price to put cheaper first
+    wholesale_catalog.sort(key=lambda x: x.price)
 
     for barrel in wholesale_catalog:
-        # current logic: request 1 if ml quantity is less than 150 for the given potion type and if there's enough gold
-        if ml_inventory[(get_ml_attribute_from_sku(barrel.sku))] < 150 and gold_plan >= barrel.price:
+        ml_type = get_ml_attribute_from_sku(barrel.sku)
+
+        # check if current ml type is less than target and if there's enough gold
+        while ml_inventory[ml_type] < target_ml and gold_plan >= barrel.price:
             purchase_request = PurchaseRequest(
                 sku=barrel.sku,
                 quantity=1
             )
             gold_plan -= barrel.price
+            ml_inventory[ml_type] += barrel.ml_per_barrel  # update the ml quantity based on the barrel
             requests.append(purchase_request)
 
-    print("Generated purchase requests:", requests)
     return requests
 

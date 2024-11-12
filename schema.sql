@@ -82,9 +82,9 @@ FROM
     inventory_ledger;
 
 
-----------------------
+------------------------
 -- CATALOG ITEMS VIEW --
------------------------
+------------------------
 -- Tracks the current quantity of each potion available in the catalog by aggregating the ledger
 CREATE VIEW current_catalog_items AS
 SELECT 
@@ -98,3 +98,21 @@ LEFT JOIN
     inventory_ledger il ON pt.id = il.potion_type_id
 GROUP BY 
     pt.id, pt.sku, pt.name;
+
+
+----------------------------------------------
+--  VERSION 5: MOCK CUSTOMER DATA INSERTION --
+----------------------------------------------
+INSERT INTO carts (customer_name, created_at) VALUES
+('Alice', '2023-01-01 10:00:00'),
+('Bob', '2023-01-02 11:00:00'),
+('Charlie', '2023-01-03 12:00:00'),
+('David', '2023-01-04 13:00:00'),
+('Eve', '2023-01-05 14:00:00');
+
+INSERT INTO cart_items (cart_id, potion_type_id, quantity, price, added_at) VALUES
+(8, 1, 2, 100, '2023-01-01 10:05:00'),
+(9, 2, 1, 50, '2023-01-02 11:05:00'),
+(10, 3, 3, 150, '2023-01-03 12:05:00'),
+(11, 4, 1, 50, '2023-01-04 13:05:00'),
+(12, 5, 2, 10, '2023-01-05 14:05:00');

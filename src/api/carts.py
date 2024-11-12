@@ -32,32 +32,79 @@ class OrderLineItem(BaseModel):
 def search_orders(
     customer_name: str = "",
     potion_sku: str = "",
-    search_page: str = "",
+    search_page: int = 1,
     sort_col: SearchSortOptions = SearchSortOptions.timestamp,
     sort_order: SearchSortOrder = SearchSortOrder.desc,
 ):
     """
     Search for cart line items by customer name and/or potion sku.
-    """
-    # simulate searching through orders (pagination limit: 5 results per page)
-    results = [
-        OrderLineItem(
-            line_item_id=1,
-            item_sku="GREEN_POTION_0",
-            customer_name="Test",
-            line_item_total=50,
-            timestamp="2021-01-01T00:00:00Z",
-        )
-    ]
 
-    start = int(search_page) * 5
-    end = start + 5
+    Customer name and potion sku filter to orders that contain the 
+    string (case insensitive). If the filters aren't provided, no
+    filtering occurs on the respective search term.
+
+    Search page is a cursor for pagination. The response to this
+    search endpoint will return previous or next if there is a
+    previous or next page of results available. The token passed
+    in that search response can be passed in the next search request
+    as search page to get that page of results.
+
+    Sort col is which column to sort by and sort order is the direction
+    of the search. They default to searching by timestamp of the order
+    in descending order.
+
+    The response itself contains a previous and next page token (if
+    such pages exist) and the results as an array of line items. Each
+    line item contains the line item id (must be unique), item sku, 
+    customer name, line item total (in gold), and timestamp of the order.
+    Your results must be paginated, the max results you can return at any
+    time is 5 total line items.
+    """
+
+    limit = 5
+    offset = (search_page - 1) * limit
+
+    with db.engine.begin() as connection:
+        order_search_query = sqlalchemy.text("""
+            SELECT potion_types.sku, carts.customer_name, cart_items.quantity, to_char(carts.created_at::timestamp, 'MM/DD/YYYY, HH12:MI:SS PM') as created_at
+            FROM carts
+            JOIN cart_items ON carts.id = cart_items.cart_id
+            JOIN potion_types ON potion_types.id = cart_items.potion_type_id
+            WHERE carts.customer_name ILIKE :customer_name
+            AND potion_types.sku ILIKE :potion_sku
+            ORDER BY 
+                CASE WHEN :sort_col = 'customer_name' AND :sort_order = 'asc' THEN carts.customer_name END ASC,
+                CASE WHEN :sort_col = 'customer_name' AND :sort_order = 'desc' THEN carts.customer_name END DESC,
+                CASE WHEN :sort_col = 'item_sku' AND :sort_order = 'asc' THEN potion_types.sku END ASC,
+                CASE WHEN :sort_col = 'item_sku' AND :sort_order = 'desc' THEN potion_types.sku END DESC,
+                CASE WHEN :sort_col = 'line_item_total' AND :sort_order = 'asc' THEN cart_items.quantity END ASC,
+                CASE WHEN :sort_col = 'line_item_total' AND :sort_order = 'desc' THEN cart_items.quantity END DESC,
+                CASE WHEN :sort_col = 'timestamp' AND :sort_order = 'asc' THEN carts.created_at END ASC,
+                CASE WHEN :sort_col = 'timestamp' AND :sort_order = 'desc' THEN carts.created_at END DESC
+            LIMIT :limit OFFSET :offset
+        """)
+        params = {
+            "customer_name": f"%{customer_name}%", 
+            "potion_sku": f"%{potion_sku}%", 
+            "sort_col": sort_col.value, 
+            "sort_order": sort_order.value, 
+            "limit": limit, 
+            "offset": offset
+        }
+        result = connection.execute(order_search_query, params)
+        orders = [
+            OrderLineItem(line_item_id=i, item_sku=row[0], customer_name=row[1], line_item_total=row[2], timestamp=row[3])
+            for i, row in enumerate(result)
+        ]
+
+    previous_page = search_page - 1 if search_page > 1 else None
+    next_page = search_page + 1 if len(orders) == limit else None
 
     return {
-        "previous": int(search_page) - 1 if int(search_page) > 0 else None,
-        "next": int(search_page) + 1 if len(results[start:end]) == 5 else None,
-        "results": results[start:end],
-    }
+        "previous": previous_page,
+        "next": next_page,
+        "results": orders,
+    } 
 
 class Customer(BaseModel):
     customer_name: str
